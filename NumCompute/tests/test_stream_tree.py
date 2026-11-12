@@ -138,3 +138,52 @@ def test_tree_predict_before_training():
 
     with pytest.raises(RuntimeError):
         model.predict([[1]])
+
+
+def test_partial_fit_learns_across_chunks():
+    model = DecisionTreeClassifier()
+
+    model.partial_fit([[1], [2]], [0, 0])
+    model.partial_fit([[3], [4]], [1, 1])
+
+    assert model.predict([[1], [4]]).tolist() == [0, 1]
+
+
+def test_partial_fit_updates_majority():
+    model = DecisionTreeClassifier(max_depth=0)
+
+    model.partial_fit([[1], [2]], [0, 0])
+    model.partial_fit([[3], [4], [5]], [1, 1, 1])
+
+    assert model.predict([[10]]).tolist() == [1]
+
+
+def test_partial_fit_returns_self():
+    model = DecisionTreeClassifier()
+
+    result = model.partial_fit([[1], [2]], [0, 1])
+
+    assert result is model
+
+
+def test_partial_fit_rejects_empty_chunk():
+    model = DecisionTreeClassifier()
+
+    with pytest.raises(ValueError):
+        model.partial_fit([], [])
+
+
+def test_partial_fit_rejects_feature_change():
+    model = DecisionTreeClassifier()
+
+    model.partial_fit([[1], [2]], [0, 1])
+
+    with pytest.raises(ValueError):
+        model.partial_fit([[1, 2]], [0])
+
+
+def test_partial_fit_rejects_nan():
+    model = DecisionTreeClassifier()
+
+    with pytest.raises(ValueError):
+        model.partial_fit([[float("nan")]], [1])

@@ -195,3 +195,119 @@ class DecisionTreeClassifier:
             predictions.append(node.value)
 
         return np.asarray(predictions)
+
+
+
+    def partial_fit(self, X_chunk, y_chunk):
+        """Update the tree using a new chunk of data."""
+        X = np.asarray(X_chunk, dtype=float)
+        y = np.asarray(y_chunk)
+
+        if X.ndim != 2 or y.ndim != 1 or len(X) != len(y) or len(y) == 0:
+            raise ValueError("X_chunk and y_chunk need matching, nonempty rows.")
+
+        if X.shape[1] == 0 or not np.all(np.isfinite(X)):
+            raise ValueError("Features must be finite and nonempty.")
+
+        if not hasattr(self, "_leaf_state"):
+            self._leaf_state = {}
+            self._stream_features = X.shape[1]
+
+        if X.shape[1] != self._stream_features:
+            raise ValueError("Feature count changed between chunks.")
+
+        if self.root is None:
+            self.root = TreeNode(value=y[0])
+
+        self._update_stream_node(self.root, X, y, depth=0)
+        return self
+
+    def _update_stream_node(self, node, X, y, depth):
+        """Update leaf statistics and grow new decision splits."""
+        if len(y) == 0:
+            return
+
+        if not node.is_leaf():
+            left = X[:, node.feature_index] <= node.threshold
+
+            self._update_stream_node(
+                node.left, X[left], y[left], depth + 1
+            )
+            self._update_stream_node(
+                node.right, X[~left], y[~left], depth + 1
+            )
+            return
+
+        state = self._leaf_state.setdefault(id(node), {
+            "counts": {},
+            "seen": 0,
+            "X": np.empty((0, X.shape[1])),
+            "y": np.empty(0, dtype=y.dtype),
+        })
+
+        classes, counts = np.unique(y, return_counts=True)
+
+        for label, count in zip(classes, counts):
+            state["counts"][label] = (
+                state["counts"].get(label, 0) + int(count)
+            )
+
+        # Update the leaf's prediction using all observed class counts.
+        node.value = min(
+            state["counts"],
+            key=lambda label: (-state["counts"][label], label)
+        )
+
+        state["seen"] += len(y)
+
+        # Keep only the latest 256 samples at each leaf.
+        state["X"] = np.concatenate((state["X"], X))[-256:]
+        state["y"] = np.concatenate((state["y"], y))[-256:]
+
+        if (
+            state["seen"] < self.min_samples_split
+            or (
+                self.max_depth is not None
+                and depth >= self.max_depth
+            )
+        ):
+            return
+
+        split = find_best_split(
+            state["X"], state["y"], self.criterion
+        )
+
+        if split is None:
+            return
+
+        feature_index, threshold, _ = split
+        left_mask = state["X"][:, feature_index] <= threshold
+
+        node.feature_index = feature_index
+        node.threshold = threshold
+        node.left = TreeNode()
+        node.right = TreeNode()
+
+        for child, mask in (
+            (node.left, left_mask),
+            (node.right, ~left_mask)
+        ):
+            child_y = state["y"][mask]
+            child_classes, child_counts = np.unique(
+                child_y, return_counts=True
+            )
+
+            child.value = child_classes[np.argmax(child_counts)]
+
+            self._leaf_state[id(child)] = {
+                "counts": dict(zip(
+                    child_classes, map(int, child_counts)
+                )),
+                "seen": len(child_y),
+                "X": state["X"][mask].copy(),
+                "y": child_y.copy(),
+            }
+
+        # This node is now a split rather than a leaf.
+        node.value = None
+        del self._leaf_state[id(node)]
