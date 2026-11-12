@@ -52,3 +52,39 @@ def test_tree_split_node():
     assert not node.is_leaf()
     assert node.left.value == 0
     assert node.right.value == 1
+
+
+from numcompute_stream.tree import find_best_split
+
+
+def test_best_split_gini():
+    X = [[1], [2], [3], [4]]
+    y = [0, 0, 1, 1]
+
+    result = find_best_split(X, y, criterion="gini")
+
+    assert result[0] == 0
+    assert result[1] == pytest.approx(2.5)
+    assert result[2] == pytest.approx(0.5)
+
+
+def test_best_split_entropy():
+    X = [[1], [2], [3], [4]]
+    y = [0, 0, 1, 1]
+
+    result = find_best_split(X, y, criterion="entropy")
+
+    assert result[1] == pytest.approx(2.5)
+    assert result[2] == pytest.approx(1.0)
+
+
+def test_best_split_single_class():
+    X = [[1], [2], [3]]
+    y = [1, 1, 1]
+
+    assert find_best_split(X, y) is None
+
+
+def test_best_split_invalid_criterion():
+    with pytest.raises(ValueError):
+        find_best_split([[1], [2]], [0, 1], criterion="invalid")
