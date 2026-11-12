@@ -1,4 +1,4 @@
-
+import numpy as np
 import pytest
 
 from numcompute_stream.tree import gini_impurity
@@ -187,3 +187,89 @@ def test_partial_fit_rejects_nan():
 
     with pytest.raises(ValueError):
         model.partial_fit([[float("nan")]], [1])
+
+
+def test_max_features_selects_one_feature():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    split = find_best_split(
+        X, y, max_features=1,
+        rng=np.random.default_rng(0)
+    )
+
+    assert split[0] == 1
+
+
+def test_max_features_sqrt():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    split = find_best_split(X, y, max_features="sqrt")
+
+    assert split is not None
+    assert split[2] > 0
+
+
+def test_max_features_log2():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    split = find_best_split(X, y, max_features="log2")
+
+    assert split is not None
+
+
+def test_max_features_fraction():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    split = find_best_split(X, y, max_features=0.5)
+
+    assert split is not None
+
+
+def test_max_features_zero_rejected():
+    with pytest.raises(ValueError):
+        find_best_split(
+            [[1, 10], [2, 20]], [0, 1],
+            max_features=0
+        )
+
+
+def test_max_features_too_large_rejected():
+    with pytest.raises(ValueError):
+        find_best_split(
+            [[1, 10], [2, 20]], [0, 1],
+            max_features=3
+        )
+
+
+def test_classifier_with_max_features():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    model = DecisionTreeClassifier(
+        max_features=1, random_state=7
+    )
+    model.fit(X, y)
+
+    assert model.predict([[1, 10], [4, 40]]).tolist() == [0, 1]
+
+
+def test_random_state_reproducibility():
+    X = [[1, 10], [2, 20], [3, 30], [4, 40]]
+    y = [0, 0, 1, 1]
+
+    first = DecisionTreeClassifier(
+        max_features=1, random_state=42
+    )
+    second = DecisionTreeClassifier(
+        max_features=1, random_state=42
+    )
+
+    first.fit(X, y)
+    second.fit(X, y)
+
+    assert first.root.feature_index == second.root.feature_index
+    assert first.predict(X).tolist() == second.predict(X).tolist()

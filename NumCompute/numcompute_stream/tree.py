@@ -18,7 +18,6 @@ def gini_impurity(y):
     return float(1.0 - np.sum(probabilities ** 2))
 
 
-
 def entropy_impurity(y):
     """Calculate entropy for a group of class labels."""
     labels = np.asarray(y)
@@ -57,7 +56,7 @@ class TreeNode:
         return self.value is not None
 
 
-def find_best_split(X, y, criterion="gini"):
+def find_best_split(X, y, criterion="gini", max_features=None, rng=None):
     """Find the feature and threshold with the highest impurity reduction."""
     X = np.asarray(X, dtype=float)
     y = np.asarray(y)
@@ -82,7 +81,50 @@ def find_best_split(X, y, criterion="gini"):
     best_gain = 0.0
     best_split = None
 
-    for feature_index in range(X.shape[1]):
+    n_features = X.shape[1]
+
+    if n_features == 0:
+        raise ValueError("X must contain at least one feature.")
+
+    if max_features is None:
+        feature_indices = range(n_features)
+    else:
+        if isinstance(max_features, str):
+            if max_features == "sqrt":
+                limit = max(1, int(np.sqrt(n_features)))
+            elif max_features == "log2":
+                limit = max(1, int(np.log2(n_features)))
+            else:
+                raise ValueError("Unknown max_features setting.")
+
+        elif isinstance(max_features, (int, np.integer)) and not isinstance(
+            max_features, (bool, np.bool_)
+        ):
+            limit = int(max_features)
+
+        elif isinstance(max_features, (float, np.floating)):
+            if not 0 < max_features <= 1:
+                raise ValueError(
+                    "Float max_features must be between 0 and 1."
+                )
+            limit = max(
+                1, int(np.ceil(max_features * n_features))
+            )
+
+        else:
+            raise ValueError("Invalid max_features setting.")
+
+        if not 1 <= limit <= n_features:
+            raise ValueError("max_features is outside the valid range.")
+
+        generator = np.random.default_rng() if rng is None else rng
+        feature_indices = generator.choice(
+            n_features,
+            size=limit,
+            replace=False
+        )
+
+    for feature_index in feature_indices:
         values = np.unique(X[:, feature_index])
 
         for i in range(len(values) - 1):
@@ -116,17 +158,28 @@ def find_best_split(X, y, criterion="gini"):
 class DecisionTreeClassifier:
     """A simple decision tree for classification."""
 
-    def __init__(self, max_depth=5, min_samples_split=2, criterion="gini"):
+    def __init__(
+        self,
+        max_depth=5,
+        min_samples_split=2,
+        criterion="gini",
+        max_features=None,
+        random_state=None
+    ):
         if max_depth is not None and max_depth < 0:
             raise ValueError("max_depth cannot be negative.")
+
         if min_samples_split < 2:
             raise ValueError("min_samples_split must be at least 2.")
+
         if criterion not in ("gini", "entropy"):
             raise ValueError("Criterion must be 'gini' or 'entropy'.")
 
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.criterion = criterion
+        self.max_features = max_features
+        self._rng = np.random.default_rng(random_state)
         self.root = None
 
     def fit(self, X, y):
@@ -136,6 +189,7 @@ class DecisionTreeClassifier:
 
         if X.ndim != 2 or y.ndim != 1 or len(X) != len(y):
             raise ValueError("X and y must have matching sample counts.")
+
         if len(y) == 0:
             raise ValueError("Training data cannot be empty.")
 
@@ -150,11 +204,21 @@ class DecisionTreeClassifier:
         if (
             classes.size == 1
             or len(y) < self.min_samples_split
-            or (self.max_depth is not None and depth >= self.max_depth)
+            or (
+                self.max_depth is not None
+                and depth >= self.max_depth
+            )
         ):
             return TreeNode(value=majority_class)
 
-        split = find_best_split(X, y, criterion=self.criterion)
+        # Find a split after checking the stopping conditions.
+        split = find_best_split(
+            X,
+            y,
+            criterion=self.criterion,
+            max_features=self.max_features,
+            rng=self._rng
+        )
 
         if split is None:
             return TreeNode(value=majority_class)
@@ -162,8 +226,17 @@ class DecisionTreeClassifier:
         feature_index, threshold, _ = split
         left_mask = X[:, feature_index] <= threshold
 
-        left_child = self._grow_tree(X[left_mask], y[left_mask], depth + 1)
-        right_child = self._grow_tree(X[~left_mask], y[~left_mask], depth + 1)
+        left_child = self._grow_tree(
+            X[left_mask],
+            y[left_mask],
+            depth + 1
+        )
+
+        right_child = self._grow_tree(
+            X[~left_mask],
+            y[~left_mask],
+            depth + 1
+        )
 
         return TreeNode(
             feature_index=feature_index,
@@ -178,6 +251,7 @@ class DecisionTreeClassifier:
             raise RuntimeError("Train the tree before predicting.")
 
         X = np.asarray(X, dtype=float)
+
         if X.ndim != 2:
             raise ValueError("X must be a two-dimensional array.")
 
@@ -196,15 +270,20 @@ class DecisionTreeClassifier:
 
         return np.asarray(predictions)
 
-
-
     def partial_fit(self, X_chunk, y_chunk):
         """Update the tree using a new chunk of data."""
         X = np.asarray(X_chunk, dtype=float)
         y = np.asarray(y_chunk)
 
-        if X.ndim != 2 or y.ndim != 1 or len(X) != len(y) or len(y) == 0:
-            raise ValueError("X_chunk and y_chunk need matching, nonempty rows.")
+        if (
+            X.ndim != 2
+            or y.ndim != 1
+            or len(X) != len(y)
+            or len(y) == 0
+        ):
+            raise ValueError(
+                "X_chunk and y_chunk need matching, nonempty rows."
+            )
 
         if X.shape[1] == 0 or not np.all(np.isfinite(X)):
             raise ValueError("Features must be finite and nonempty.")
@@ -219,7 +298,13 @@ class DecisionTreeClassifier:
         if self.root is None:
             self.root = TreeNode(value=y[0])
 
-        self._update_stream_node(self.root, X, y, depth=0)
+        self._update_stream_node(
+            self.root,
+            X,
+            y,
+            depth=0
+        )
+
         return self
 
     def _update_stream_node(self, node, X, y, depth):
@@ -231,19 +316,30 @@ class DecisionTreeClassifier:
             left = X[:, node.feature_index] <= node.threshold
 
             self._update_stream_node(
-                node.left, X[left], y[left], depth + 1
+                node.left,
+                X[left],
+                y[left],
+                depth + 1
             )
+
             self._update_stream_node(
-                node.right, X[~left], y[~left], depth + 1
+                node.right,
+                X[~left],
+                y[~left],
+                depth + 1
             )
+
             return
 
-        state = self._leaf_state.setdefault(id(node), {
-            "counts": {},
-            "seen": 0,
-            "X": np.empty((0, X.shape[1])),
-            "y": np.empty(0, dtype=y.dtype),
-        })
+        state = self._leaf_state.setdefault(
+            id(node),
+            {
+                "counts": {},
+                "seen": 0,
+                "X": np.empty((0, X.shape[1])),
+                "y": np.empty(0, dtype=y.dtype),
+            }
+        )
 
         classes, counts = np.unique(y, return_counts=True)
 
@@ -252,7 +348,7 @@ class DecisionTreeClassifier:
                 state["counts"].get(label, 0) + int(count)
             )
 
-        # Update the leaf's prediction using all observed class counts.
+        # Update prediction from all observed class counts.
         node.value = min(
             state["counts"],
             key=lambda label: (-state["counts"][label], label)
@@ -260,9 +356,14 @@ class DecisionTreeClassifier:
 
         state["seen"] += len(y)
 
-        # Keep only the latest 256 samples at each leaf.
-        state["X"] = np.concatenate((state["X"], X))[-256:]
-        state["y"] = np.concatenate((state["y"], y))[-256:]
+        # Retain at most 256 recent samples per leaf.
+        state["X"] = np.concatenate(
+            (state["X"], X)
+        )[-256:]
+
+        state["y"] = np.concatenate(
+            (state["y"], y)
+        )[-256:]
 
         if (
             state["seen"] < self.min_samples_split
@@ -273,15 +374,22 @@ class DecisionTreeClassifier:
         ):
             return
 
+        # Find the split after the stopping conditions.
         split = find_best_split(
-            state["X"], state["y"], self.criterion
+            state["X"],
+            state["y"],
+            criterion=self.criterion,
+            max_features=self.max_features,
+            rng=self._rng
         )
 
         if split is None:
             return
 
         feature_index, threshold, _ = split
-        left_mask = state["X"][:, feature_index] <= threshold
+        left_mask = (
+            state["X"][:, feature_index] <= threshold
+        )
 
         node.feature_index = feature_index
         node.threshold = threshold
@@ -293,21 +401,28 @@ class DecisionTreeClassifier:
             (node.right, ~left_mask)
         ):
             child_y = state["y"][mask]
+
             child_classes, child_counts = np.unique(
-                child_y, return_counts=True
+                child_y,
+                return_counts=True
             )
 
-            child.value = child_classes[np.argmax(child_counts)]
+            child.value = child_classes[
+                np.argmax(child_counts)
+            ]
 
             self._leaf_state[id(child)] = {
-                "counts": dict(zip(
-                    child_classes, map(int, child_counts)
-                )),
+                "counts": dict(
+                    zip(
+                        child_classes,
+                        map(int, child_counts)
+                    )
+                ),
                 "seen": len(child_y),
                 "X": state["X"][mask].copy(),
                 "y": child_y.copy(),
             }
 
-        # This node is now a split rather than a leaf.
+        # The leaf has now become a decision split.
         node.value = None
         del self._leaf_state[id(node)]
