@@ -33,3 +33,25 @@ def entropy_impurity(y):
     probabilities = counts / counts.sum()
 
     return float(-np.sum(probabilities * np.log2(probabilities)))
+
+
+class TreeNode:
+    """Represent a decision split or a leaf in a decision tree."""
+
+    def __init__(
+        self,
+        feature_index=None,
+        threshold=None,
+        left=None,
+        right=None,
+        value=None
+    ):
+        self.feature_index = feature_index
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value
+
+    def is_leaf(self):
+        """Return True when this node stores a prediction."""
+        return self.value is not None
