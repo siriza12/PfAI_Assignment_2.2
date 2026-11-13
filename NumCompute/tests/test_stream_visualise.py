@@ -122,3 +122,24 @@ def test_plot_metric_over_time_rejects_empty():
             title="Accuracy",
             ylabel="Score"
         )
+
+
+
+from numcompute_stream.visualise import plot_predictions_vs_truth
+
+
+def test_plot_predictions_vs_truth():
+    fig, ax = plot_predictions_vs_truth(
+        [0, 1, 0, 1],
+        [0, 1, 1, 1]
+    )
+
+    assert ax.get_title() == "Predictions vs Ground Truth"
+    assert len(ax.collections) == 2
+
+    plt.close(fig)
+
+
+def test_plot_predictions_vs_truth_rejects_mismatch():
+    with pytest.raises(ValueError):
+        plot_predictions_vs_truth([0, 1], [0])

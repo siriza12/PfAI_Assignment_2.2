@@ -148,3 +148,54 @@ def plot_metric_over_time(metric_values, title, ylabel):
 
     fig.tight_layout()
     return fig, ax
+
+
+def plot_predictions_vs_truth(y_true, y_pred):
+    """Compare predicted class labels with actual labels."""
+    import numpy as np
+
+    actual = np.asarray(y_true)
+    predicted = np.asarray(y_pred)
+
+    if (
+        actual.ndim != 1
+        or predicted.ndim != 1
+        or len(actual) != len(predicted)
+        or len(actual) == 0
+    ):
+        raise ValueError("Labels must be matching nonempty 1D arrays.")
+
+    # Convert labels into positions for plotting.
+    labels = np.unique(np.concatenate((actual, predicted)))
+    actual_positions = np.searchsorted(labels, actual)
+    predicted_positions = np.searchsorted(labels, predicted)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    samples = np.arange(len(actual))
+
+    ax.scatter(
+        samples,
+        actual_positions,
+        label="Ground Truth",
+        marker="o",
+        alpha=0.7
+    )
+
+    ax.scatter(
+        samples,
+        predicted_positions,
+        label="Predictions",
+        marker="x",
+        alpha=0.7
+    )
+
+    ax.set_xlabel("Sample Index")
+    ax.set_ylabel("Class Label")
+    ax.set_title("Predictions vs Ground Truth")
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels([str(label) for label in labels])
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax
