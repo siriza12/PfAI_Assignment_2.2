@@ -553,3 +553,124 @@ def auc(x, y):
         raise ValueError("x must be monotonic (increasing or decreasing).")
 
     return float(direction * np.sum(dx * (y[1:] + y[:-1]) / 2.0))
+
+
+class StreamingClassificationMetrics:
+    """Track cumulative classification results across data chunks."""
+
+    def __init__(self):
+        self.classes_ = []
+        self.confusion_ = np.zeros((0, 0), dtype=np.int64)
+        self.total_samples = 0
+
+    def update(self, y_true, y_pred):
+        """Update the confusion matrix with a new batch of predictions."""
+        actual = np.asarray(y_true)
+        predicted = np.asarray(y_pred)
+
+        if (
+            actual.ndim != 1
+            or predicted.ndim != 1
+            or len(actual) != len(predicted)
+        ):
+            raise ValueError("Labels must be matching 1D arrays.")
+
+        if len(actual) == 0:
+            raise ValueError("Cannot update using an empty chunk.")
+
+        labels = np.unique(np.concatenate((actual, predicted)))
+
+        for label in labels:
+            if label not in self.classes_:
+                self.classes_.append(label)
+
+        old_size = len(self.confusion_)
+        new_size = len(self.classes_)
+
+        if new_size > old_size:
+            expanded = np.zeros(
+                (new_size, new_size), dtype=np.int64
+            )
+            expanded[:old_size, :old_size] = self.confusion_
+            self.confusion_ = expanded
+
+        mapping = {
+            label: index
+            for index, label in enumerate(self.classes_)
+        }
+
+        for truth, prediction in zip(actual, predicted):
+            self.confusion_[
+                mapping[truth],
+                mapping[prediction]
+            ] += 1
+
+        self.total_samples += len(actual)
+        return self
+
+    def confusion_matrix(self):
+        """Return a copy of the accumulated confusion matrix."""
+        return self.confusion_.copy()
+
+    def accuracy(self):
+        """Return accuracy across all processed chunks."""
+        if self.total_samples == 0:
+            return 0.0
+
+        return float(
+            np.trace(self.confusion_) / self.total_samples
+        )
+
+    def precision(self):
+        """Return macro-averaged precision across classes."""
+        if self.total_samples == 0:
+            return 0.0
+
+        true_positives = np.diag(self.confusion_)
+        predicted_totals = self.confusion_.sum(axis=0)
+
+        scores = np.divide(
+            true_positives,
+            predicted_totals,
+            out=np.zeros(len(self.classes_), dtype=float),
+            where=predicted_totals > 0
+        )
+
+        return float(np.mean(scores))
+
+    def recall(self):
+        """Return macro-averaged recall across classes."""
+        if self.total_samples == 0:
+            return 0.0
+
+        true_positives = np.diag(self.confusion_)
+        actual_totals = self.confusion_.sum(axis=1)
+
+        scores = np.divide(
+            true_positives,
+            actual_totals,
+            out=np.zeros(len(self.classes_), dtype=float),
+            where=actual_totals > 0
+        )
+
+        return float(np.mean(scores))
+
+    def f1_score(self):
+        """Return macro F1 calculated separately for each class."""
+        if self.total_samples == 0:
+            return 0.0
+
+        true_positives = np.diag(self.confusion_)
+        predicted_totals = self.confusion_.sum(axis=0)
+        actual_totals = self.confusion_.sum(axis=1)
+
+        denominator = predicted_totals + actual_totals
+
+        scores = np.divide(
+            2 * true_positives,
+            denominator,
+            out=np.zeros(len(self.classes_), dtype=float),
+            where=denominator > 0
+        )
+
+        return float(np.mean(scores))
