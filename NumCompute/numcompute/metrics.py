@@ -676,6 +676,26 @@ class StreamingClassificationMetrics:
         return float(np.mean(scores))
 
 
+    def result(self):
+        """Return the accumulated classification metrics."""
+        return {
+            "accuracy": self.accuracy(),
+            "precision": self.precision(),
+            "recall": self.recall(),
+            "f1_score": self.f1_score(),
+            "confusion_matrix": self.confusion_matrix(),
+            "total_samples": self.total_samples,
+        }
+
+    def reset(self):
+        """Clear all accumulated classification statistics."""
+        self.classes_ = []
+        self.confusion_ = np.zeros((0, 0), dtype=np.int64)
+        self.total_samples = 0
+        return self
+
+
+
 class StreamingAUC:
     """Estimate binary ROC AUC using bounded score histograms."""
 
