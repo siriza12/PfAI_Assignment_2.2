@@ -96,3 +96,29 @@ def test_plot_model_comparison_requires_data():
 
     with pytest.raises(ValueError):
         plot_model_comparison(tree_history, [])
+
+
+from numcompute_stream.visualise import plot_metric_over_time
+
+
+def test_plot_metric_over_time():
+    fig, ax = plot_metric_over_time(
+        [0.60, 0.75, 0.90],
+        title="Accuracy Over Time",
+        ylabel="Accuracy"
+    )
+
+    assert ax.get_title() == "Accuracy Over Time"
+    assert ax.get_ylabel() == "Accuracy"
+    assert len(ax.lines[0].get_ydata()) == 3
+
+    plt.close(fig)
+
+
+def test_plot_metric_over_time_rejects_empty():
+    with pytest.raises(ValueError):
+        plot_metric_over_time(
+            [],
+            title="Accuracy",
+            ylabel="Score"
+        )

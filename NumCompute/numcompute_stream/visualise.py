@@ -120,3 +120,31 @@ def plot_model_comparison(tree_history, ensemble_history):
 
     fig.tight_layout()
     return fig, ax
+
+
+def plot_metric_over_time(metric_values, title, ylabel):
+    """Plot a numerical metric across successive streaming chunks."""
+    import numpy as np
+
+    values = np.asarray(metric_values, dtype=float)
+
+    if values.ndim != 1 or values.size == 0:
+        raise ValueError("metric_values must be a nonempty 1D sequence.")
+
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Metric values must be finite.")
+
+    chunks = np.arange(1, len(values) + 1)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.plot(chunks, values, marker="o", label=ylabel)
+
+    ax.set_xlabel("Chunk number")
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    fig.tight_layout()
+    return fig, ax
