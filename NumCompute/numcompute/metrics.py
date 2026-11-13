@@ -775,6 +775,24 @@ class StreamingAUC:
         return float(concordant / (positives * negatives))
 
 
+    def result(self):
+        """Return the cumulative AUC and sample counts."""
+        return {
+            "auc": self.auc(),
+            "total_samples": self.total_samples,
+            "positive_samples": int(self.positive_counts.sum()),
+            "negative_samples": int(self.negative_counts.sum()),
+        }
+
+    def reset(self):
+        """Clear accumulated AUC statistics."""
+        self.positive_counts.fill(0)
+        self.negative_counts.fill(0)
+        self.total_samples = 0
+        return self
+
+
+
 class RollingWindowMetrics:
     """Track classification accuracy over the most recent samples."""
 

@@ -39,3 +39,31 @@ def test_auc_requires_both_classes():
 
     with pytest.raises(ValueError):
         metric.update([0, 1], [0.2, 1.5])
+
+
+
+def test_streaming_auc_result():
+    metric = StreamingAUC()
+
+    metric.update([0, 0], [0.1, 0.2])
+    metric.update([1, 1], [0.8, 0.9])
+
+    result = metric.result()
+
+    assert result["auc"] == pytest.approx(1.0)
+    assert result["total_samples"] == 4
+    assert result["positive_samples"] == 2
+    assert result["negative_samples"] == 2
+
+
+def test_streaming_auc_reset():
+    metric = StreamingAUC()
+
+    metric.update([0, 1], [0.2, 0.8])
+    returned = metric.reset()
+
+    assert returned is metric
+    assert metric.total_samples == 0
+    assert metric.positive_counts.sum() == 0
+    assert metric.negative_counts.sum() == 0
+    assert np.isnan(metric.auc())
