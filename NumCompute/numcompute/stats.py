@@ -637,6 +637,12 @@ class StreamingFeatureStats:
 
         return self
 
+    def update_stats(self, X_chunk):
+        """Update per-feature statistics using a new data chunk."""
+        return self.update(X_chunk)
+
+
+
     def _check_fitted(self):
         if self._features is None:
             raise RuntimeError("Update with a chunk before reading statistics.")
@@ -714,6 +720,12 @@ class StreamingHistogram:
     def histogram(self):
         """Return copies of bin counts and edges."""
         return self.counts.copy(), self.edges.copy()
+
+    def update_stats(self, X_chunk):
+        """Update per-feature statistics from a new data chunk."""
+        return self.update(X_chunk)
+
+
 
 
 class StreamingQuantiles:

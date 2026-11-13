@@ -39,3 +39,22 @@ def test_feature_stats_skips_nan():
 
     with pytest.raises(ValueError):
         stats.update([[1, 2, 3]])
+
+
+def test_update_stats_api():
+    stats = StreamingFeatureStats()
+
+    stats.update_stats([[1, 10], [3, 20]])
+    stats.update_stats([[5, 30]])
+
+    np.testing.assert_allclose(stats.mean, [3, 20])
+    np.testing.assert_array_equal(stats.count, [3, 3])
+
+
+def test_update_stats_returns_self():
+    stats = StreamingFeatureStats()
+
+    result = stats.update_stats([[2, 4], [6, 8]])
+
+    assert result is stats
+    np.testing.assert_allclose(stats.mean, [4, 6])
