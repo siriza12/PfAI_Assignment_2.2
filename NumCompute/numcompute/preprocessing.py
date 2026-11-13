@@ -137,6 +137,79 @@ class StandardScaler(Transformer):
         return (X - self.mean_) / self.scale_
 
 
+    def partial_fit(self, X, y=None):
+        """Update running mean and variance using a new data chunk."""
+        X = np.asarray(X, dtype=np.float64)
+
+        if X.ndim != 2 or X.size == 0:
+            raise ValueError("Expected a nonempty 2D data chunk.")
+
+        if np.any(np.isinf(X)):
+            raise ValueError("Infinite values are not supported.")
+
+        n_features = X.shape[1]
+
+        if not hasattr(self, "n_seen_"):
+            self.n_seen_ = np.zeros(n_features, dtype=int)
+            self.mean_ = np.zeros(n_features)
+            self._m2_ = np.zeros(n_features)
+            self.scale_ = np.ones(n_features)
+
+        if n_features != len(self.n_seen_):
+            raise ValueError("Feature count changed between chunks.")
+
+        valid = ~np.isnan(X)
+        batch_count = valid.sum(axis=0)
+        batch_sum = np.nansum(X, axis=0)
+
+        batch_mean = np.divide(
+            batch_sum,
+            batch_count,
+            out=np.zeros(n_features),
+            where=batch_count > 0,
+        )
+
+        deviations = np.zeros_like(X)
+        np.subtract(
+            X, batch_mean, out=deviations, where=valid
+        )
+        batch_m2 = np.sum(deviations ** 2, axis=0)
+
+        total = self.n_seen_ + batch_count
+        delta = batch_mean - self.mean_
+
+        weight = np.divide(
+            batch_count,
+            total,
+            out=np.zeros(n_features),
+            where=total > 0,
+        )
+
+        correction = np.divide(
+            self.n_seen_ * batch_count,
+            total,
+            out=np.zeros(n_features),
+            where=total > 0,
+        )
+
+        self.mean_ += delta * weight
+        self._m2_ += batch_m2 + delta ** 2 * correction
+        self.n_seen_ = total
+
+        variance = np.divide(
+            self._m2_,
+            total,
+            out=np.zeros(n_features),
+            where=total > 0,
+        )
+
+        self.scale_ = np.sqrt(variance)
+        self.scale_[self.scale_ == 0] = 1.0
+
+        return self
+
+
+
 class MinMaxScaler(Transformer):
     """
     Transform features by scaling each feature to a given range.
