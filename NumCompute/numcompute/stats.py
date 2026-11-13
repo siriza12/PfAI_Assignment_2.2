@@ -675,3 +675,42 @@ class StreamingFeatureStats:
     def std(self, ddof=0):
         """Running standard deviation for every feature."""
         return np.sqrt(self.variance(ddof=ddof))
+
+
+class StreamingHistogram:
+    """Count observations across fixed bins without storing samples."""
+
+    def __init__(self, bins=10, value_range=(0.0, 1.0)):
+        if not isinstance(bins, (int, np.integer)) or isinstance(bins, (bool, np.bool_)) or bins < 1:
+            raise ValueError("bins must be a positive integer.")
+
+        low, high = value_range
+
+        if not np.isfinite(low) or not np.isfinite(high) or low >= high:
+            raise ValueError("value_range must contain increasing finite bounds.")
+
+        self.edges = np.linspace(low, high, bins + 1)
+        self.counts = np.zeros(bins, dtype=np.int64)
+        self.total_seen = 0
+
+    def update(self, values):
+        """Accumulate histogram counts from a new chunk."""
+        values = np.asarray(values, dtype=float)
+
+        if values.ndim != 1:
+            raise ValueError("Expected a one-dimensional chunk.")
+
+        if np.any(np.isinf(values)):
+            raise ValueError("Infinite values are not supported.")
+
+        valid = values[~np.isnan(values)]
+
+        counts, _ = np.histogram(valid, bins=self.edges)
+        self.counts += counts
+        self.total_seen += len(valid)
+
+        return self
+
+    def histogram(self):
+        """Return copies of bin counts and edges."""
+        return self.counts.copy(), self.edges.copy()
