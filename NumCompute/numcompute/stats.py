@@ -609,3 +609,69 @@ class RunningStats:
         - Time and space complexity: O(1)
         """
         return float(np.sqrt(self.variance(ddof)))
+
+
+class StreamingFeatureStats:
+    """Track running statistics separately for each feature column."""
+
+    def __init__(self):
+        self._features = None
+
+    def update(self, X_chunk):
+        """Update statistics using one 2D chunk of data."""
+        X = np.asarray(X_chunk, dtype=float)
+
+        if X.ndim != 2 or X.size == 0:
+            raise ValueError("Expected a nonempty 2D chunk.")
+
+        if self._features is None:
+            self._features = [
+                RunningStats() for _ in range(X.shape[1])
+            ]
+
+        if X.shape[1] != len(self._features):
+            raise ValueError("Feature count changed between chunks.")
+
+        for column, stats in enumerate(self._features):
+            stats.update(X[:, column])
+
+        return self
+
+    def _check_fitted(self):
+        if self._features is None:
+            raise RuntimeError("Update with a chunk before reading statistics.")
+
+    @property
+    def count(self):
+        """Number of valid observations per feature."""
+        self._check_fitted()
+        return np.array([s.count for s in self._features])
+
+    @property
+    def mean(self):
+        """Running mean for every feature."""
+        self._check_fitted()
+        return np.array([s.mean for s in self._features])
+
+    @property
+    def min(self):
+        """Running minimum for every feature."""
+        self._check_fitted()
+        return np.array([s.min for s in self._features])
+
+    @property
+    def max(self):
+        """Running maximum for every feature."""
+        self._check_fitted()
+        return np.array([s.max for s in self._features])
+
+    def variance(self, ddof=0):
+        """Running variance for every feature."""
+        self._check_fitted()
+        return np.array([
+            s.variance(ddof=ddof) for s in self._features
+        ])
+
+    def std(self, ddof=0):
+        """Running standard deviation for every feature."""
+        return np.sqrt(self.variance(ddof=ddof))
