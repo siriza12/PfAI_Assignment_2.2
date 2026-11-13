@@ -714,3 +714,65 @@ class StreamingHistogram:
     def histogram(self):
         """Return copies of bin counts and edges."""
         return self.counts.copy(), self.edges.copy()
+
+
+class StreamingQuantiles:
+    """Approximate quantiles using a bounded reservoir sample."""
+
+    def __init__(self, reservoir_size=256, random_state=42):
+        if (
+            isinstance(reservoir_size, (bool, np.bool_))
+            or not isinstance(reservoir_size, (int, np.integer))
+            or reservoir_size < 1
+        ):
+            raise ValueError("reservoir_size must be a positive integer.")
+
+        self.reservoir_size = int(reservoir_size)
+        self._rng = np.random.default_rng(random_state)
+        self._samples = []
+        self.n_seen = 0
+
+    def update(self, values):
+        """Update the reservoir with a new chunk of observations."""
+        values = np.asarray(values, dtype=float)
+
+        if values.ndim != 1:
+            raise ValueError("Expected one-dimensional values.")
+
+        if np.any(np.isinf(values)):
+            raise ValueError("Infinite values are not supported.")
+
+        for value in values:
+            if np.isnan(value):
+                continue
+
+            self.n_seen += 1
+
+            if len(self._samples) < self.reservoir_size:
+                self._samples.append(float(value))
+            else:
+                index = int(self._rng.integers(0, self.n_seen))
+
+                if index < self.reservoir_size:
+                    self._samples[index] = float(value)
+
+        return self
+
+    def quantile(self, q):
+        """Estimate a quantile between zero and one."""
+        if not 0 <= q <= 1:
+            raise ValueError("q must be between 0 and 1.")
+
+        if not self._samples:
+            raise RuntimeError("No observations have been received.")
+
+        return float(np.quantile(self._samples, q))
+
+    def median(self):
+        """Return the approximate median."""
+        return self.quantile(0.5)
+
+    @property
+    def stored_samples(self):
+        """Number of observations currently retained."""
+        return len(self._samples)
