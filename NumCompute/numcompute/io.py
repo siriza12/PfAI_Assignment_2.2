@@ -162,3 +162,31 @@ def load_csv(file_path, delimiter=',', missing="fill", fill_value=np.nan,
             )
 
     return np.where(is_missing, fill_value, data)
+
+
+
+def load_csv_chunks(file_path, chunk_size=100, target_column=-1):
+    """Yield numeric CSV data in chunks through the custom I/O module.
+
+    Parameters
+    ----------
+    file_path : str or Path
+        Path to a CSV file containing a header row.
+    chunk_size : int
+        Maximum number of data rows per chunk.
+    target_column : int
+        Index of the column containing classification labels.
+
+    Yields
+    ------
+    tuple
+        X_chunk of shape (n_samples, n_features) and
+        y_chunk of shape (n_samples,).
+    """
+    from numcompute_stream.csv_stream import read_csv_chunks
+
+    yield from read_csv_chunks(
+        file_path,
+        chunk_size=chunk_size,
+        target_column=target_column,
+    )

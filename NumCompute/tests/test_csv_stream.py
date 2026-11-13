@@ -43,3 +43,40 @@ def test_csv_stream_rejects_invalid_chunk_size(tmp_path):
 
     with pytest.raises(ValueError):
         list(read_csv_chunks(path, chunk_size=0))
+
+
+
+from numcompute.io import load_csv, load_csv_chunks
+
+
+def test_io_csv_chunks_match_existing_loader(tmp_path):
+    path = tmp_path / "stream.csv"
+    path.write_text(
+        "a,b,target\n"
+        "1,10,0\n"
+        "2,20,0\n"
+        "3,30,1\n"
+        "4,40,1\n"
+        "5,50,1\n",
+        encoding="utf-8",
+    )
+
+    chunks = list(load_csv_chunks(path, chunk_size=2))
+
+    assert [len(y) for _, y in chunks] == [2, 2, 1]
+
+    combined = np.vstack([
+        np.column_stack((X, y))
+        for X, y in chunks
+    ])
+
+    expected = load_csv(path, skip_header=1)
+    np.testing.assert_allclose(combined, expected)
+
+
+def test_io_csv_chunks_reject_invalid_size(tmp_path):
+    path = tmp_path / "stream.csv"
+    path.write_text("feature,target\n1,0\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        list(load_csv_chunks(path, chunk_size=0))
