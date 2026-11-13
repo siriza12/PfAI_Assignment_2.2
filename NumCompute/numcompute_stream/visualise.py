@@ -262,3 +262,9 @@ def save_plot(fig, file_path, dpi=150):
     )
 
     return path
+
+
+
+def plot_predictions_vs_ground_truth(y_true, y_pred):
+    """Plot predicted labels against ground-truth labels."""
+    return plot_predictions_vs_truth(y_true, y_pred)
