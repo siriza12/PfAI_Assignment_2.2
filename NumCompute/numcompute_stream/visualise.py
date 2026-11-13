@@ -235,3 +235,30 @@ def compare_models(metric1, metric2, labels):
 
     fig.tight_layout()
     return fig, ax
+
+
+
+def save_plot(fig, file_path, dpi=150):
+    """Save a Matplotlib figure to PNG, PDF or SVG."""
+    from pathlib import Path
+
+    if not hasattr(fig, "savefig"):
+        raise TypeError("Expected a Matplotlib figure.")
+
+    path = Path(file_path)
+
+    if path.suffix.lower() not in (".png", ".pdf", ".svg"):
+        raise ValueError("Supported formats are PNG, PDF and SVG.")
+
+    if isinstance(dpi, bool) or not isinstance(dpi, (int, float)) or dpi <= 0:
+        raise ValueError("dpi must be a positive number.")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig.savefig(
+        path,
+        dpi=dpi,
+        bbox_inches="tight"
+    )
+
+    return path

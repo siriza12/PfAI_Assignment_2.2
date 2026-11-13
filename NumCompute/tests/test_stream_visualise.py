@@ -169,3 +169,42 @@ def test_compare_models_rejects_mismatched_data():
             [0.7],
             ["Tree", "Ensemble"]
         )
+
+
+
+from numcompute_stream.visualise import save_plot
+
+
+def test_save_plot_png(tmp_path):
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [0.5, 0.7, 0.9])
+
+    path = tmp_path / "figures" / "accuracy.png"
+    result = save_plot(fig, path)
+
+    assert result.exists()
+    assert result.stat().st_size > 0
+
+    plt.close(fig)
+
+
+def test_save_plot_pdf(tmp_path):
+    fig, ax = plt.subplots()
+    ax.plot([1, 2], [0.6, 0.8])
+
+    path = tmp_path / "performance.pdf"
+    result = save_plot(fig, path)
+
+    assert result.exists()
+    assert result.suffix == ".pdf"
+
+    plt.close(fig)
+
+
+def test_save_plot_rejects_invalid_format(tmp_path):
+    fig, ax = plt.subplots()
+
+    with pytest.raises(ValueError):
+        save_plot(fig, tmp_path / "graph.txt")
+
+    plt.close(fig)
