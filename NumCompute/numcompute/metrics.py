@@ -847,3 +847,12 @@ class RollingWindowMetrics:
         self._correct.clear()
         self.total_seen = 0
         return self
+
+    def result(self):
+        """Return current rolling-window classification statistics."""
+        return {
+            "accuracy": self.accuracy(),
+            "window_size": self.window_size,
+            "samples_in_window": self.samples_in_window,
+            "total_seen": self.total_seen,
+        }
