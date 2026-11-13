@@ -616,3 +616,54 @@ class SimpleImputer(Transformer):
             raise ValueError("Incompatible dimensionality.")
 
         return np.where(np.isnan(X), self.fill_value, X)
+
+
+class StreamingMeanImputer(SimpleImputer):
+    """Replace missing values using an incrementally updated mean."""
+
+    def fit(self, X, y=None):
+        """Reset previous statistics and fit one batch."""
+        self._counts = None
+        return self.partial_fit(X, y)
+
+    def partial_fit(self, X, y=None):
+        """Update per-feature means without storing previous chunks."""
+        X = np.asarray(X, dtype=float)
+
+        if X.ndim != 2 or X.size == 0:
+            raise ValueError("Expected a nonempty 2D chunk.")
+
+        if np.any(np.isinf(X)):
+            raise ValueError("Infinite values are not supported.")
+
+        if getattr(self, "_counts", None) is None:
+            self.columns_ = X.shape[1]
+            self._counts = np.zeros(self.columns_, dtype=int)
+            self._sums = np.zeros(self.columns_, dtype=float)
+
+        if X.shape[1] != self.columns_:
+            raise ValueError("Feature count changed between chunks.")
+
+        self._counts += np.sum(~np.isnan(X), axis=0)
+        self._sums += np.nansum(X, axis=0)
+
+        self.statistics_ = np.divide(
+            self._sums,
+            self._counts,
+            out=np.full(self.columns_, self.fill_value, dtype=float),
+            where=self._counts > 0,
+        )
+
+        return self
+
+    def transform(self, X):
+        """Replace NaNs with the latest running feature means."""
+        if getattr(self, "_counts", None) is None:
+            raise RuntimeError("Fit the imputer before transforming.")
+
+        X = np.asarray(X, dtype=float)
+
+        if X.ndim != 2 or X.shape[1] != self.columns_:
+            raise ValueError("Incorrect input dimensions.")
+
+        return np.where(np.isnan(X), self.statistics_, X)
