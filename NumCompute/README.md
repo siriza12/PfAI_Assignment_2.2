@@ -42,7 +42,7 @@ pip install -e .
 ### 4. VSCode setup
 
 1. Install the **Python**, **Pylance**, and **Jupyter** extentions.
-2. Open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → **Python: Select Interpreter** → choose the `numComp_env` conda environment.
+2. Open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) â†’ **Python: Select Interpreter** â†’ choose the `numComp_env` conda environment.
 3. If IntelliSense/linting doesn't pick up the change right away, run **Developer: Reload Window** from the command palette.
 4. Confirm the correct interpreter is active by opening a new integrated terminal (it should auto-activate `numComp_env`) and running:
 
@@ -116,7 +116,7 @@ parameters, return value, exceptions, and time and space complexity.
   distance loops over features, so no (n, m, d) array is built.
 - **Numerical stability.** `softmax`, `log_softmax` and `logsumexp` subtract the maximum first.
   Quantiles and percentiles interpolate in a form that does not overflow for -1e308 and 1e308.
-  Euclidean distance uses `np.hypot`, because the shortcut `|x|² + |y|² - 2x·y` gives 0 for
+  Euclidean distance uses `np.hypot`, because the shortcut `|x|Â² + |y|Â² - 2xÂ·y` gives 0 for
   the points 1e9 and 1e9 + 1. `StandardScaler` and `MinMaxScaler` handle values near 1e308.
   `RunningStats` uses Welford's update.
 - **Repeatable results.** Sorting is stable, so tied values keep their original order, and random
@@ -156,7 +156,7 @@ pytest -v
 
 ### 5. Stop on first failure
 
-Useful when debugging — stops immediately instead of running the whole suite:
+Useful when debugging â€” stops immediately instead of running the whole suite:
 
 ```bash
 pytest -x
@@ -184,7 +184,7 @@ pytest --cov=numcompute --cov-report=term-missing tests/
 
 ### 8. Running tests in VSCode
 
-1. Open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → **Python: Configure Tests** → select **pytest** → select the `tests/` directory.
+1. Open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) â†’ **Python: Configure Tests** â†’ select **pytest** â†’ select the `tests/` directory.
 2. Tests will then appear in the **Testing** sidebar (flask icon), where you can run/debug individual tests or the whole suite with one click.
 
 ### Test files
@@ -247,3 +247,93 @@ finite-difference checks, are in `benchmark/results.md`.
 | Edward Coombs | Repository and package set-up, `io`, `preprocessing` and `pipeline` with their tests, CI and test configuration, the setup and testing sections of this README, the first version of the demo notebook, and the demo video |
 | Jaidev Parthiban | `metrics`, `optim`, `stats`, `rank`, `sort_search`, `utils` and `benchmarking` with their tests, the benchmark scripts, the code review with its regression and integration tests, and the examples, API overview and performance sections of this README |
 | Sai Siriza Gaddam | `tests/test_additional_utils_benchmarking.py` and the finished `demo/quickstart.ipynb` |
+
+## Assignment 2.2: Streaming Classification
+
+This extension adds incremental classification and streaming data
+processing to the original NumCompute toolkit.
+
+### Features
+
+- Decision tree classification using Gini or Entropy.
+- Configurable maximum depth, minimum samples and feature selection.
+- Incremental tree updates using `partial_fit()`.
+- Bagging ensemble with multiple decision trees and majority voting.
+- Chunk-based CSV reading without loading the complete file.
+- Incremental standard scaling, missing-value imputation and encoding.
+- Streaming statistics, histograms and approximate quantiles.
+- Cumulative classification metrics, approximate AUC and rolling accuracy.
+- Per-chunk model evaluation, execution-time and memory logging.
+- Matplotlib visualisations with image export support.
+
+### Installation
+
+Use Python 3.12 or a compatible version.
+
+From the `NumCompute` directory in Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e . matplotlib notebook
+```
+
+### Running Tests
+
+Run all tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+The test suite covers the original toolkit and streaming components.
+
+### Running the Streaming Demo
+
+Run the CSV classification demonstration:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo.stream_demo
+```
+
+The Jupyter demonstration is located at:
+
+`demo/stream_demo.ipynb`
+
+Open it in VS Code, select the project `.venv` Python kernel,
+and use **Run All**.
+
+The notebook demonstrates CSV processing, incremental model updates,
+prequential evaluation, model comparisons and visualisations.
+
+### Running Benchmarks
+
+Loop versus NumPy vectorisation:
+
+```powershell
+.\.venv\Scripts\python.exe -m benchmark.stream_vectorization
+```
+
+Single tree versus ensemble:
+
+```powershell
+.\.venv\Scripts\python.exe -m benchmark.stream_model_comparison
+```
+
+Streaming tree versus ensemble:
+
+```powershell
+.\.venv\Scripts\python.exe -m benchmark.streaming_performance
+```
+
+Benchmark timings depend on the hardware and execution environment.
+
+### Important Implementation Notes
+
+- Streaming tree updates retain a bounded sample buffer per leaf.
+- The ensemble uses bootstrap sampling to update individual trees.
+- The AUC estimator uses fixed score histograms for bounded memory.
+- Quantiles are approximated using reservoir sampling.
+- Evaluation is performed before updating the model on each new chunk.
+- The demo uses synthetic classification data for reproducible testing.
+
+This extension uses NumPy and Matplotlib without scikit-learn or pandas.
