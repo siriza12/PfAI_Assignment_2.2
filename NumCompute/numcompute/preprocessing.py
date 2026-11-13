@@ -511,6 +511,35 @@ class OneHotEncoder(Transformer):
         return np.hstack(encoded_columns).astype(np.float64)
 
 
+    def partial_fit(self, X, y=None):
+        """Learn new categories without forgetting previous chunks."""
+        X = self._as_array(X)
+
+        if X.ndim != 2 or X.size == 0:
+            raise ValueError("Expected a nonempty two-dimensional chunk.")
+
+        if not hasattr(self, "categories_"):
+            return self.fit(X, y)
+
+        if X.shape[1] != len(self.categories_):
+            raise ValueError("Feature count changed between chunks.")
+
+        updated = []
+
+        for index, old_categories in enumerate(self.categories_):
+            new_categories = self._unique(X[:, index])
+
+            combined = np.concatenate((
+                old_categories.astype(object),
+                new_categories.astype(object),
+            ))
+
+            updated.append(self._unique(combined))
+
+        self.categories_ = updated
+        return self
+
+
 class SimpleImputer(Transformer):
     """
     Impute missing values (NaN) with a constant value.
