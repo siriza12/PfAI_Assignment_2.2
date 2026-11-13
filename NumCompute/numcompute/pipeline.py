@@ -323,3 +323,36 @@ class Pipeline:
         if not hasattr(estimator, "predict"):
             raise TypeError(f"Final pipeline step {name!r} must implement predict")
         return estimator.predict(transformed)
+
+
+
+    def partial_fit(self, X, y=None):
+        """Incrementally update transformers and the final estimator."""
+        if not self.steps:
+            return self
+
+        transformed = X
+
+        for name, transformer in self.steps[:-1]:
+            if not hasattr(transformer, "partial_fit"):
+                raise TypeError(
+                    f"Pipeline step {name!r} must implement partial_fit."
+                )
+
+            if not hasattr(transformer, "transform"):
+                raise TypeError(
+                    f"Pipeline step {name!r} must implement transform."
+                )
+
+            transformer.partial_fit(transformed, y)
+            transformed = transformer.transform(transformed)
+
+        name, estimator = self.steps[-1]
+
+        if not hasattr(estimator, "partial_fit"):
+            raise TypeError(
+                f"Final pipeline step {name!r} must implement partial_fit."
+            )
+
+        estimator.partial_fit(transformed, y)
+        return self

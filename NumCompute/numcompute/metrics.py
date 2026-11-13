@@ -674,3 +674,138 @@ class StreamingClassificationMetrics:
         )
 
         return float(np.mean(scores))
+
+
+class StreamingAUC:
+    """Estimate binary ROC AUC using bounded score histograms."""
+
+    def __init__(self, n_bins=100):
+        if (
+            isinstance(n_bins, (bool, np.bool_))
+            or not isinstance(n_bins, (int, np.integer))
+            or n_bins < 2
+        ):
+            raise ValueError("n_bins must be an integer of at least 2.")
+
+        self.n_bins = int(n_bins)
+        self.positive_counts = np.zeros(n_bins, dtype=np.int64)
+        self.negative_counts = np.zeros(n_bins, dtype=np.int64)
+        self.total_samples = 0
+
+    def update(self, y_true, y_score):
+        """Accumulate score histograms for one data chunk."""
+        labels = np.asarray(y_true)
+        scores = np.asarray(y_score, dtype=float)
+
+        if (
+            labels.ndim != 1
+            or scores.ndim != 1
+            or len(labels) != len(scores)
+            or len(labels) == 0
+        ):
+            raise ValueError("Labels and scores need matching nonempty 1D arrays.")
+
+        if not np.all(np.isin(labels, [0, 1])):
+            raise ValueError("AUC labels must be binary: 0 or 1.")
+
+        if not np.all(np.isfinite(scores)):
+            raise ValueError("Scores must be finite.")
+
+        if np.any((scores < 0) | (scores > 1)):
+            raise ValueError("Scores must be probabilities between 0 and 1.")
+
+        indices = np.minimum(
+            (scores * self.n_bins).astype(int),
+            self.n_bins - 1
+        )
+
+        self.positive_counts += np.bincount(
+            indices[labels == 1],
+            minlength=self.n_bins
+        )
+
+        self.negative_counts += np.bincount(
+            indices[labels == 0],
+            minlength=self.n_bins
+        )
+
+        self.total_samples += len(labels)
+        return self
+
+    def auc(self):
+        """Return the approximate ROC AUC."""
+        positives = int(self.positive_counts.sum())
+        negatives = int(self.negative_counts.sum())
+
+        if positives == 0 or negatives == 0:
+            return float("nan")
+
+        # Negatives in bins below the current score bin.
+        negatives_below = (
+            np.cumsum(self.negative_counts)
+            - self.negative_counts
+        )
+
+        # Scores within the same bin are treated as ties.
+        concordant = np.sum(
+            self.positive_counts
+            * (negatives_below + 0.5 * self.negative_counts)
+        )
+
+        return float(concordant / (positives * negatives))
+
+
+class RollingWindowMetrics:
+    """Track classification accuracy over the most recent samples."""
+
+    def __init__(self, window_size=100):
+        from collections import deque
+
+        if (
+            isinstance(window_size, (bool, np.bool_))
+            or not isinstance(window_size, (int, np.integer))
+            or window_size < 1
+        ):
+            raise ValueError("window_size must be a positive integer.")
+
+        self.window_size = int(window_size)
+        self._correct = deque(maxlen=self.window_size)
+        self.total_seen = 0
+
+    def update(self, y_true, y_pred):
+        """Add predictions while keeping only the latest window."""
+        actual = np.asarray(y_true)
+        predicted = np.asarray(y_pred)
+
+        if (
+            actual.ndim != 1
+            or predicted.ndim != 1
+            or len(actual) != len(predicted)
+            or len(actual) == 0
+        ):
+            raise ValueError("Labels must be matching nonempty 1D arrays.")
+
+        matches = actual == predicted
+
+        self._correct.extend(bool(value) for value in matches)
+        self.total_seen += len(actual)
+
+        return self
+
+    def accuracy(self):
+        """Return accuracy over the most recent observations."""
+        if not self._correct:
+            return 0.0
+
+        return float(sum(self._correct) / len(self._correct))
+
+    @property
+    def samples_in_window(self):
+        """Return the number of observations currently retained."""
+        return len(self._correct)
+
+    def reset(self):
+        """Clear the rolling window and counters."""
+        self._correct.clear()
+        self.total_seen = 0
+        return self
