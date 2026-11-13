@@ -199,3 +199,39 @@ def plot_predictions_vs_truth(y_true, y_pred):
 
     fig.tight_layout()
     return fig, ax
+
+
+def compare_models(metric1, metric2, labels):
+    """Compare two models using metric values across chunks."""
+    import numpy as np
+
+    first = np.asarray(metric1, dtype=float)
+    second = np.asarray(metric2, dtype=float)
+
+    if first.ndim != 1 or second.ndim != 1:
+        raise ValueError("Model metrics must be one-dimensional.")
+
+    if len(first) == 0 or len(first) != len(second):
+        raise ValueError("Both models need equal, nonempty metrics.")
+
+    if not np.all(np.isfinite(first)) or not np.all(np.isfinite(second)):
+        raise ValueError("Metric values must be finite.")
+
+    if len(labels) != 2:
+        raise ValueError("Provide exactly two model labels.")
+
+    chunks = np.arange(1, len(first) + 1)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.plot(chunks, first, marker="o", label=labels[0])
+    ax.plot(chunks, second, marker="s", label=labels[1])
+
+    ax.set_xlabel("Chunk Number")
+    ax.set_ylabel("Metric Value")
+    ax.set_title("Streaming Model Comparison")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    return fig, ax

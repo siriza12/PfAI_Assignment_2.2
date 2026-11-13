@@ -143,3 +143,29 @@ def test_plot_predictions_vs_truth():
 def test_plot_predictions_vs_truth_rejects_mismatch():
     with pytest.raises(ValueError):
         plot_predictions_vs_truth([0, 1], [0])
+
+
+from numcompute_stream.visualise import compare_models
+
+
+def test_compare_models():
+    fig, ax = compare_models(
+        [0.60, 0.75, 0.85],
+        [0.65, 0.80, 0.90],
+        ["Decision Tree", "Ensemble"]
+    )
+
+    assert len(ax.lines) == 2
+    assert ax.lines[0].get_label() == "Decision Tree"
+    assert ax.lines[1].get_label() == "Ensemble"
+
+    plt.close(fig)
+
+
+def test_compare_models_rejects_mismatched_data():
+    with pytest.raises(ValueError):
+        compare_models(
+            [0.5, 0.6],
+            [0.7],
+            ["Tree", "Ensemble"]
+        )
